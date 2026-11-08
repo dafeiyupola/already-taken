@@ -30,6 +30,7 @@ import json
 import os
 import re
 import sys
+import urllib.error
 import urllib.parse
 import urllib.request
 
@@ -46,14 +47,25 @@ def _token() -> str:
     return tok
 
 
+class ApiError(RuntimeError):
+    """A GitHub call failed; the caller decides whether that is fatal."""
+
+
 def get(url: str, token: str):
     req = urllib.request.Request(url, headers={
         "Authorization": "Bearer " + token,
         "Accept": "application/vnd.github+json",
         "User-Agent": "already-taken",
     })
-    with urllib.request.urlopen(req, timeout=30) as r:
-        return json.load(r)
+    try:
+        with urllib.request.urlopen(req, timeout=30) as r:
+            return json.load(r)
+    except urllib.error.HTTPError as e:
+        # GitHub's timeline endpoint answers 500 for some issues. Without this the
+        # whole check dies with a traceback instead of saying what went wrong.
+        raise ApiError(f"{e.code} {e.reason} — {url}") from e
+    except urllib.error.URLError as e:
+        raise ApiError(f"network error: {e.reason} — {url}") from e
 
 
 def timeline_refs(repo: str, num: int, token: str) -> list[tuple[str, str, str]]:
@@ -78,12 +90,16 @@ def timeline_refs(repo: str, num: int, token: str) -> list[tuple[str, str, str]]
     return out
 
 
-def files_touched(repo: str, num: int, token: str, limit: int = 3) -> list[tuple[str, str, str]]:
+def files_touched(repo: str, num: int, token: str, issue: dict | None = None,
+                  limit: int = 3) -> list[tuple[str, str, str]]:
     """Files the issue names that changed after it was opened."""
-    issue = get(f"{API}/repos/{repo}/issues/{num}", token)
+    issue = issue if issue is not None else get(f"{API}/repos/{repo}/issues/{num}", token)
     opened = issue.get("created_at") or ""
     text = (issue.get("title") or "") + "\n" + (issue.get("body") or "")
     paths = {m.group(0) for m in FILE_RE.finditer(text)}
+    # An issue body can name a path outside the repo ("../hi/QUICKSTART.md").
+    # Asking GitHub for its history answers 500 and takes the whole check down.
+    paths = {p for p in paths if ".." not in p.split("/") and not p.startswith("/")}
     hits = []
     for path in list(paths)[:limit]:
         commits = get(
@@ -96,8 +112,8 @@ def files_touched(repo: str, num: int, token: str, limit: int = 3) -> list[tuple
     return hits
 
 
-def classify(refs, touched):
-    """Pure: turn the two evidence lists into a verdict. Kept separate so it can be tested."""
+def classify(refs, touched, closed: bool = False):
+    """Pure: turn the evidence into a verdict. Kept separate so it can be tested."""
     for kind, label, state in refs:
         if kind == "pull" and state == "open":
             return TAKEN, f"an open PR is on it: {label}"
@@ -105,6 +121,10 @@ def classify(refs, touched):
             return TAKEN, f"a merged PR already did it: {label}"
         if kind == "commit":
             return TAKEN, f"a commit references it: {label}"
+    if closed:
+        # Closed means someone settled it, even when nothing cross-references it.
+        # Reporting FREE here would send the reader to work on a dead issue.
+        return TAKEN, "the issue is closed"
     if touched:
         path, sha, msg = touched[0]
         return UNSURE, f"{path} changed after the issue was opened ({sha} {msg})"
@@ -113,8 +133,9 @@ def classify(refs, touched):
 
 def check(repo: str, num: int, token: str) -> tuple[str, str, list, list]:
     refs = timeline_refs(repo, num, token)
-    touched = files_touched(repo, num, token)
-    state, why = classify(refs, touched)
+    issue = get(f"{API}/repos/{repo}/issues/{num}", token)
+    touched = files_touched(repo, num, token, issue)
+    state, why = classify(refs, touched, closed=issue.get("state") == "closed")
     return state, why, refs, touched
 
 
@@ -136,6 +157,14 @@ def main() -> int:
     args = ap.parse_args()
     token = _token()
 
+    try:
+        return run(args, token)
+    except ApiError as e:
+        print(f"already-taken: {e}", file=sys.stderr)
+        return 3
+
+
+def run(args, token: str) -> int:
     if args.cmd == "check":
         repo, _, num = args.target.partition("#")
         if not num.isdigit():
