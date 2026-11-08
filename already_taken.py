@@ -130,6 +130,9 @@ def main() -> int:
     s.add_argument("--since", default="2026-10-01")
     s.add_argument("--limit", type=int, default=30)
 
+    c.add_argument("--json", action="store_true", help="machine-readable output")
+    s.add_argument("--json", action="store_true", help="machine-readable output")
+
     args = ap.parse_args()
     token = _token()
 
@@ -138,6 +141,15 @@ def main() -> int:
         if not num.isdigit():
             sys.exit("expected owner/repo#123")
         state, why, refs, touched = check(repo, int(num), token)
+        if args.json:
+            print(json.dumps({
+                "target": args.target,
+                "verdict": state,
+                "reason": why,
+                "references": [{"kind": k, "label": lbl, "state": st} for k, lbl, st in refs],
+                "touched_files": [{"path": p, "commit": c, "message": m} for p, c, m in touched],
+            }, ensure_ascii=False, indent=2))
+            return {FREE: 0, TAKEN: 1, UNSURE: 2}[state]
         print(f"{args.target}: {state.upper()} — {why}")
         for kind, label, st in refs:
             print(f"  [{kind} {st}] {label}")
@@ -153,6 +165,14 @@ def main() -> int:
         repo = i["repository_url"].split("/repos/")[-1]
         state, why, _, _ = check(repo, i["number"], token)
         buckets[state].append((f"{repo}#{i['number']}", i["title"][:70], why))
+    if getattr(args, "json", False):
+        print(json.dumps({
+            "free": [{"target": k, "title": t} for k, t, _ in buckets[FREE]],
+            "taken": [{"target": k, "title": t, "reason": w} for k, t, w in buckets[TAKEN]],
+            "unsure": [{"target": k, "title": t, "reason": w} for k, t, w in buckets[UNSURE]],
+        }, ensure_ascii=False, indent=2))
+        return 0
+
     for state, title in ((TAKEN, "already taken"), (UNSURE, "worth a manual look"), (FREE, "free")):
         rows = buckets[state]
         print(f"\n== {title} ({len(rows)}) ==")
