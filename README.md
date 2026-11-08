@@ -38,6 +38,24 @@ already-taken scan --label "good first issue" --since 2026-10-01 --limit 30
 
 `scan` prints three buckets: taken, worth a manual look, and free.
 
+## Machine-readable output
+
+`--json` on either subcommand, for scripts and for anything else that is going to read this instead of a person:
+
+```json
+{
+  "target": "eyalgolan/statecraft-israel#2771",
+  "verdict": "taken",
+  "reason": "a merged PR already did it: #2781 ...",
+  "references": [{"kind": "pull", "label": "#2781 ...", "state": "merged"}],
+  "touched_files": [{"path": "docs/mvp-checklist.md", "commit": "fd59f274", "message": "..."}]
+}
+```
+
+`scan --json` returns three arrays (`free`, `taken`, `unsure`) instead of the printed sections.
+
+Exit codes stay the same either way: `0` free, `1` taken, `2` unsure, so `already-taken check x#1 || true` still branches the way you expect.
+
 ## What it does not do
 
 - **It does not tell you whether the issue is worth doing.** Only whether someone else got there first.
