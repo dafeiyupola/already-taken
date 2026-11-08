@@ -37,3 +37,14 @@ def test_a_touched_file_makes_it_unsure_rather_than_free():
 def test_an_open_pr_outranks_a_touched_file():
     state, _ = classify([("pull", "#12 fix it", "open")], [("a.py", "deadbee", "x")])
     assert state == TAKEN
+
+
+def test_a_closed_issue_is_taken_even_with_no_reference():
+    # Closed means someone settled it. Reporting FREE sends the reader to a dead issue.
+    state, why = classify([], [], closed=True)
+    assert state == TAKEN
+    assert "closed" in why
+
+
+def test_closed_outranks_a_touched_file():
+    assert classify([], [("a.py", "deadbee", "x")], closed=True)[0] == TAKEN
