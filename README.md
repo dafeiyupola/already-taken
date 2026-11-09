@@ -17,6 +17,10 @@ The third was not ordinary. The issue was open, there was no PR anywhere, and no
 
 That is the case this tool is actually for. It asks GitHub's timeline for PRs and commits that point at the issue, and then asks a second, dumber question: **has any file the issue names been modified since the issue was opened?** If the answer is yes, you get `UNSURE` rather than a false `FREE`.
 
+## Three real cases
+
+`docs/case-studies.md` walks through three issues that all looked unclaimed, with the command output and the links: one with an open PR underneath it, one already merged while the issue stayed open, and one with no reference anywhere that a commit had already changed.
+
 ## Verdicts
 
 | verdict | meaning | exit |
