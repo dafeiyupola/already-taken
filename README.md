@@ -26,7 +26,7 @@ That is the case this tool is actually for. It asks GitHub's timeline for PRs an
 | verdict | meaning | exit |
 |---|---|---|
 | `FREE` | no open PR, no merged PR, no commit, and the files it names are untouched | 0 |
-| `TAKEN` | an open PR, a merged PR, or a commit already references it | 1 |
+| `TAKEN` | the issue is closed, or an open PR, a merged PR, or a commit already references it | 1 |
 | `UNSURE` | a file the issue names changed after it was opened — look before you type | 2 |
 
 `UNSURE` is a soft signal on purpose. A file can change for reasons unrelated to the issue. Skipping everything that touches a file is too strict; ignoring it is how you waste an evening. Look, then decide.
