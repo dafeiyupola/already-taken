@@ -63,9 +63,29 @@ def get(url: str, token: str):
     except urllib.error.HTTPError as e:
         # GitHub's timeline endpoint answers 500 for some issues. Without this the
         # whole check dies with a traceback instead of saying what went wrong.
-        raise ApiError(f"{e.code} {e.reason} — {url}") from e
+        raise ApiError(_explain(e, url)) from e
     except urllib.error.URLError as e:
         raise ApiError(f"network error: {e.reason} — {url}") from e
+
+
+def _explain(e, url: str) -> str:
+    """A status code is not an error message. Say what to do about it."""
+    if e.code == 401:
+        return "GITHUB_TOKEN was rejected — check it is valid and not expired"
+    if e.code in (403, 429):
+        headers = getattr(e, "headers", None) or {}
+        if str(headers.get("X-RateLimit-Remaining")) == "0":
+            reset = headers.get("X-RateLimit-Reset")
+            when = ""
+            if reset and str(reset).isdigit():
+                import datetime
+                when = " (resets " + datetime.datetime.fromtimestamp(
+                    int(reset), datetime.timezone.utc).strftime("%H:%M UTC") + ")"
+            return f"rate limited by GitHub{when} — wait for the reset, or use a token with more quota"
+        return f"GitHub refused this request (403) for {url}"
+    if e.code == 404:
+        return f"not found — check the owner/repo and the issue number ({url})"
+    return f"GitHub answered {e.code} {e.reason} for {url}"
 
 
 def timeline_refs(repo: str, num: int, token: str) -> list[tuple[str, str, str]]:
