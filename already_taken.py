@@ -88,7 +88,20 @@ def _explain(e, url: str) -> str:
     return f"GitHub answered {e.code} {e.reason} for {url}"
 
 
-def timeline_refs(repo: str, num: int, token: str) -> list[tuple[str, str, str]]:
+CLOSING_RE = re.compile(r"\b(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?)\b[^\n]{0,60}?#(\d+)\b", re.I)
+
+
+def closes_issue(body: str | None, num: int) -> bool:
+    """Does this PR body say, in GitHub's closing syntax, that it closes THIS issue?
+
+    A cross-reference alone means someone mentioned the issue, not that they fixed it.
+    """
+    if not body:
+        return False
+    return any(int(m) == num for m in CLOSING_RE.findall(body))
+
+
+def timeline_refs(repo: str, num: int, token: str) -> list[tuple[str, str, str, bool]]:
     """Everything the issue's timeline says points at it: (kind, label, state)."""
     events = get(f"{API}/repos/{repo}/issues/{num}/timeline?per_page=100", token)
     out = []
@@ -101,12 +114,18 @@ def timeline_refs(repo: str, num: int, token: str) -> list[tuple[str, str, str]]
         title = (linked.get("title") or "")[:60]
         if n is not None and linked.get("pull_request"):
             state = "merged" if linked["pull_request"].get("merged_at") else linked.get("state", "?")
-            out.append(("pull", f"#{n} {title}", state))
+            closes = False
+            try:
+                pr = get(f"{API}/repos/{repo}/pulls/{n}", token)
+                closes = closes_issue(pr.get("body"), num)
+            except ApiError:
+                closes = False
+            out.append(("pull", f"#{n} {title}", state, closes))
         elif n is not None:
-            out.append(("issue", f"#{n} {title}", linked.get("state", "?")))
+            out.append(("issue", f"#{n} {title}", linked.get("state", "?"), False))
         else:
             c = src.get("commit") or {}
-            out.append(("commit", f"{(c.get('id') or '')[:8]} {(c.get('message') or '').splitlines()[0][:60]}", "commit"))
+            out.append(("commit", f"{(c.get('id') or '')[:8]} {(c.get('message') or '').splitlines()[0][:60]}", "commit", False))
     return out
 
 
@@ -149,13 +168,18 @@ def files_touched(repo: str, num: int, token: str, issue: dict | None = None,
 
 def classify(refs, touched, closed: bool = False, files_named: int | None = None):
     """Pure: turn the evidence into a verdict. Kept separate so it can be tested."""
-    for kind, label, state in refs:
-        if kind == "pull" and state == "open":
-            return TAKEN, f"an open PR is on it: {label}"
-        if kind == "pull" and state == "merged":
-            return TAKEN, f"a merged PR already did it: {label}"
+    mentioned = []
+    for kind, label, state, closes in refs:
+        if kind == "pull" and state == "open" and closes:
+            return TAKEN, f"an open PR says it closes this: {label}"
+        if kind == "pull" and state == "merged" and closes:
+            return TAKEN, f"a merged PR says it closed this: {label}"
         if kind == "commit":
             return TAKEN, f"a commit references it: {label}"
+        if kind == "pull":
+            # Issues cross-reference each other constantly ("also affects #X"); that is not
+            # evidence anyone is working on this one. Only a pull request counts.
+            mentioned.append(f"{label} ({state})")
     if closed:
         # Closed means someone settled it, even when nothing cross-references it.
         # Reporting FREE here would send the reader to work on a dead issue.
@@ -163,6 +187,8 @@ def classify(refs, touched, closed: bool = False, files_named: int | None = None
     if touched:
         path, sha, msg = touched[0]
         return UNSURE, f"{path} changed after the issue was opened ({sha} {msg})"
+    if mentioned:
+        return UNSURE, f"mentioned but never claimed closed: {'; '.join(mentioned[:2])}"
     if files_named == 0:
         # Saying FREE here would claim the third check passed when it never ran.
         return FREE, ("no PR and no commit, but the issue names no file — "
