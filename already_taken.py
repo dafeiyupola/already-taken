@@ -190,6 +190,7 @@ def main() -> int:
     s.add_argument("--label", default="good first issue")
     s.add_argument("--since", default="2026-10-01")
     s.add_argument("--limit", type=int, default=30)
+    s.add_argument("--repo", help="only this owner/repo, e.g. pallets/flask")
 
     c.add_argument("--json", action="store_true", help="machine-readable output")
     s.add_argument("--json", action="store_true", help="machine-readable output")
@@ -226,9 +227,16 @@ def run(args, token: str) -> int:
             print(f"  [file] {path} ← {sha} {msg}")
         return {FREE: 0, TAKEN: 1, UNSURE: 2}[state]
 
-    q = urllib.parse.quote(f'label:"{args.label}" state:open type:issue created:>{args.since}')
-    found = get(f"{API}/search/issues?q={q}&sort=created&order=desc&per_page={args.limit}", token)
-    issues = [i for i in found.get("items", []) if "pull_request" not in i]
+    if getattr(args, "repo", None):
+        # GitHub's search API cannot be scoped to one repo reliably enough to
+        # page through a backlog, so ask the repo directly.
+        q = urllib.parse.quote(args.label)
+        found = get(f"{API}/repos/{args.repo}/issues?state=open&labels={q}&per_page={args.limit}", token)
+        issues = [i for i in found if "pull_request" not in i]
+    else:
+        q = urllib.parse.quote(f'label:"{args.label}" state:open type:issue created:>{args.since}')
+        found = get(f"{API}/search/issues?q={q}&sort=created&order=desc&per_page={args.limit}", token)
+        issues = [i for i in found.get("items", []) if "pull_request" not in i]
     buckets = {FREE: [], TAKEN: [], UNSURE: []}
     for i in issues:
         repo = i["repository_url"].split("/repos/")[-1]
