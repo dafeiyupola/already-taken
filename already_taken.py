@@ -110,16 +110,31 @@ def timeline_refs(repo: str, num: int, token: str) -> list[tuple[str, str, str]]
     return out
 
 
+def _named_paths(issue: dict) -> list[str]:
+    """Paths the issue names, in the order they appear, deduplicated.
+
+    Empty means the issue names no file at all — which is not the same as
+    "no file changed", and the caller has to say so.
+    """
+    text = (issue.get("title") or "") + "\n" + (issue.get("body") or "")
+    seen, out = set(), []
+    for m in FILE_RE.finditer(text):
+        path = m.group(0)
+        # An issue can name a path outside the repo ("../hi/QUICKSTART.md").
+        # Asking GitHub for its history answers 500 and takes the whole check down.
+        if path in seen or ".." in path.split("/") or path.startswith("/"):
+            continue
+        seen.add(path)
+        out.append(path)
+    return out
+
+
 def files_touched(repo: str, num: int, token: str, issue: dict | None = None,
                   limit: int = 3) -> list[tuple[str, str, str]]:
     """Files the issue names that changed after it was opened."""
     issue = issue if issue is not None else get(f"{API}/repos/{repo}/issues/{num}", token)
     opened = issue.get("created_at") or ""
-    text = (issue.get("title") or "") + "\n" + (issue.get("body") or "")
-    paths = {m.group(0) for m in FILE_RE.finditer(text)}
-    # An issue body can name a path outside the repo ("../hi/QUICKSTART.md").
-    # Asking GitHub for its history answers 500 and takes the whole check down.
-    paths = {p for p in paths if ".." not in p.split("/") and not p.startswith("/")}
+    paths = _named_paths(issue)
     hits = []
     for path in list(paths)[:limit]:
         commits = get(
@@ -132,7 +147,7 @@ def files_touched(repo: str, num: int, token: str, issue: dict | None = None,
     return hits
 
 
-def classify(refs, touched, closed: bool = False):
+def classify(refs, touched, closed: bool = False, files_named: int | None = None):
     """Pure: turn the evidence into a verdict. Kept separate so it can be tested."""
     for kind, label, state in refs:
         if kind == "pull" and state == "open":
@@ -148,6 +163,10 @@ def classify(refs, touched, closed: bool = False):
     if touched:
         path, sha, msg = touched[0]
         return UNSURE, f"{path} changed after the issue was opened ({sha} {msg})"
+    if files_named == 0:
+        # Saying FREE here would claim the third check passed when it never ran.
+        return FREE, ("no PR and no commit, but the issue names no file — "
+                      "a silent commit change could not be ruled out")
     return FREE, "no PR, no commit, and the files it names are untouched"
 
 
@@ -155,7 +174,8 @@ def check(repo: str, num: int, token: str) -> tuple[str, str, list, list]:
     refs = timeline_refs(repo, num, token)
     issue = get(f"{API}/repos/{repo}/issues/{num}", token)
     touched = files_touched(repo, num, token, issue)
-    state, why = classify(refs, touched, closed=issue.get("state") == "closed")
+    state, why = classify(refs, touched, closed=issue.get("state") == "closed",
+                          files_named=len(_named_paths(issue)))
     return state, why, refs, touched
 
 
