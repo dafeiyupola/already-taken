@@ -48,3 +48,17 @@ def test_a_closed_issue_is_taken_even_with_no_reference():
 
 def test_closed_outranks_a_touched_file():
     assert classify([], [("a.py", "deadbee", "x")], closed=True)[0] == TAKEN
+
+
+def test_free_says_so_when_the_issue_names_no_file():
+    # Two different facts: "the files it names are untouched" and "it names no
+    # files, so that check never ran". Only one of them is reassuring.
+    state, why = classify([], [], files_named=0)
+    assert state == FREE
+    assert "could not be ruled out" in why
+
+
+def test_free_is_plain_when_a_file_was_actually_checked():
+    state, why = classify([], [], files_named=1)
+    assert state == FREE
+    assert "untouched" in why
