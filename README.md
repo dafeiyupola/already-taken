@@ -64,6 +64,20 @@ already-taken scan --label "good first issue" --since 2026-10-01 --limit 30
 
 Exit codes stay the same either way: `0` free, `1` taken, `2` unsure, so `already-taken check x#1 || true` still branches the way you expect.
 
+## What it measured
+
+On `flisk-sh/flisk`, 50 open `good first issue`s, 2026-11-12:
+
+```
+taken 0   unsure 21   free 29
+```
+
+None of the fifty had a pull request that says it closes them. The 21 unsure split into 14 mentioned by a PR that never claimed to close them, and 7 whose named file changed after the issue was opened (mostly an automatic version bump).
+
+The first run of this tool answered `taken 15`. That answer was wrong. It counted any cross-referenced pull request as a fix; `flisk-sh/flisk#3852` is still open while the tool reported `#3850` solved it, and `#3850`'s body says `Fixes #3829`. Only closing syntax counts now.
+
+That is the honest state of this tool: it tells you when someone claimed an issue, and it stays quiet when all that exists is a mention.
+
 ## What it does not do
 
 - **It does not tell you whether the issue is worth doing.** Only whether someone else got there first.
