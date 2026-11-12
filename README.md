@@ -19,7 +19,7 @@ That is the case this tool is actually for. It asks GitHub's timeline for PRs an
 
 ## The number, measured
 
-`docs/measurement.md` walks a real 50-issue backlog. The first run said 15 of them were already taken — the tool was wrong, a spot-check caught it, and the corrected number is **0 of 50**. The write-up keeps all three rounds, including the one that would have made a better story.
+`docs/measurement.md` walks four real backlogs, 71 issues. The first run said 15 of 50 were already taken — the tool was wrong, a spot-check caught it. Corrected, across four repositories: **22 of 71 taken (31%)**, and all eleven in `vercel/next.js`. The write-up keeps every round, including the ones that said what I wanted.
 
 ## Three real cases
 
