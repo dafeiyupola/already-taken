@@ -166,6 +166,16 @@ def files_touched(repo: str, num: int, token: str, issue: dict | None = None,
     return hits
 
 
+def refs_as_dicts(refs) -> list[dict]:
+    """The evidence as JSON. Unpacks the real 4-tuple; the tests only ever
+    exercised classify(), so the printing path went out unpinned once."""
+    return [{"kind": k, "label": lbl, "state": st, "closes": cl} for k, lbl, st, cl in refs]
+
+
+def refs_as_lines(refs) -> list[str]:
+    return [f"[{k} {st}{' closes' if cl else ''}] {lbl}" for k, lbl, st, cl in refs]
+
+
 def classify(refs, touched, closed: bool = False, files_named: int | None = None):
     """Pure: turn the evidence into a verdict. Kept separate so it can be tested."""
     mentioned = []
@@ -242,13 +252,13 @@ def run(args, token: str) -> int:
                 "target": args.target,
                 "verdict": state,
                 "reason": why,
-                "references": [{"kind": k, "label": lbl, "state": st} for k, lbl, st in refs],
+                "references": refs_as_dicts(refs),
                 "touched_files": [{"path": p, "commit": c, "message": m} for p, c, m in touched],
             }, ensure_ascii=False, indent=2))
             return {FREE: 0, TAKEN: 1, UNSURE: 2}[state]
         print(f"{args.target}: {state.upper()} — {why}")
-        for kind, label, st in refs:
-            print(f"  [{kind} {st}] {label}")
+        for line in refs_as_lines(refs):
+            print(f"  {line}")
         for path, sha, msg in touched:
             print(f"  [file] {path} ← {sha} {msg}")
         return {FREE: 0, TAKEN: 1, UNSURE: 2}[state]
