@@ -75,3 +75,15 @@ def test_a_cross_reference_without_closing_syntax_is_not_taken():
 
 def test_a_closing_pull_request_still_takes_it():
     assert classify([("pull", "#3850 fixes this", "merged", True)], [])[0] == TAKEN
+
+
+def test_the_rendering_path_accepts_the_real_tuple_shape():
+    # timeline_refs returns 4-tuples; classify was tested with the real shape
+    # but the printing and --json paths were not, and both went out unpacking 3.
+    from already_taken import refs_as_dicts, refs_as_lines
+
+    refs = [("pull", "#12 fix it", "open", True), ("commit", "abc1234 mention", "commit", False)]
+    assert refs_as_dicts(refs)[0]["closes"] is True
+    lines = refs_as_lines(refs)
+    assert "closes" in lines[0]
+    assert len(lines) == 2
