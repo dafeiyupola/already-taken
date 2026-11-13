@@ -66,7 +66,7 @@ Exit codes stay the same either way: `0` free, `1` taken, `2` unsure, so `alread
 
 ## What it measured
 
-On `flisk-sh/flisk`, 50 open `good first issue`s, 2026-11-12:
+One repository first: `flisk-sh/flisk`, 50 open `good first issue`s, 2026-11-12:
 
 ```
 taken 0   unsure 21   free 29
@@ -77,6 +77,16 @@ None of the fifty had a pull request that says it closes them. The 21 unsure spl
 The first run of this tool answered `taken 15`. That answer was wrong. It counted any cross-referenced pull request as a fix; `flisk-sh/flisk#3852` is still open while the tool reported `#3850` solved it, and `#3850`'s body says `Fixes #3829`. Only closing syntax counts now.
 
 That is the honest state of this tool: it tells you when someone claimed an issue, and it stays quiet when all that exists is a mention.
+
+**One repository is one observation, though.** Run across four, the picture is not "nobody competes" but "it depends where":
+
+```
+vercel/next.js      11 of 11 taken
+lingdojo/kana-dojo   9 of 30 taken
+flisk-sh/flisk       2 of 30 taken
+```
+
+71 issues, 22 taken (31%). The crowded repositories are crowded. [docs/measurement.md](docs/measurement.md) has the whole run, including the round that said what I wanted it to say.
 
 ## What it does not do
 
