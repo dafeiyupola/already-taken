@@ -87,3 +87,16 @@ def test_the_rendering_path_accepts_the_real_tuple_shape():
     lines = refs_as_lines(refs)
     assert "closes" in lines[0]
     assert len(lines) == 2
+
+
+def test_automated_version_churn_is_not_evidence():
+    # A dependency bump touches the same file an issue names often enough to
+    # swamp the unsure bucket; it says nothing about whether anyone is working.
+    from already_taken import _is_bump
+
+    assert _is_bump(":arrow_up: (deps): bump the npm group with 3 updates")
+    assert _is_bump("chore(deps): update lockfile")
+    assert _is_bump("Release 1.4.0")
+    assert not _is_bump("Fix(ci): handle skipped jobs in e2e")
+    assert not _is_bump("perf(up): write the first resource snapshot")
+    assert not _is_bump("")
