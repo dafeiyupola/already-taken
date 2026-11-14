@@ -35,6 +35,21 @@ import urllib.parse
 import urllib.request
 
 API = "https://api.github.com"
+# Messages that mean "a machine moved a version around", not "a person worked
+# on this". They touch the same files an issue names often enough to swamp the
+# unsure bucket: on one real backlog, 7 of 30 issues landed there only because a
+# dependency bump had touched .github/workflows.
+BUMP_RE = re.compile(
+    r"(^|\b)(chore\(deps\)|build\(deps\)|deps\b|bump\b|release\b|version\b|dependabot|renovate)",
+    re.IGNORECASE,
+)
+
+
+def _is_bump(message: str) -> bool:
+    """True for automated version churn. A judgement call, and the detail stays visible."""
+    return bool(BUMP_RE.search(message or ""))
+
+
 FILE_RE = re.compile(r"[\w./-]+\.(?:py|ts|tsx|js|jsx|rs|go|md|yml|yaml|toml|json|rb|java|c|h|cpp)\b")
 
 FREE, TAKEN, UNSURE = "free", "taken", "unsure"
@@ -162,7 +177,10 @@ def files_touched(repo: str, num: int, token: str, issue: dict | None = None,
         )
         if commits:
             c = commits[0]
-            hits.append((path, c["sha"][:8], (c["commit"]["message"] or "").splitlines()[0][:50]))
+            msg = (c["commit"]["message"] or "").splitlines()[0]
+            if _is_bump(msg):
+                continue
+            hits.append((path, c["sha"][:8], msg[:50]))
     return hits
 
 
