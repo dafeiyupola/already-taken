@@ -35,6 +35,14 @@ That is the case this tool is actually for. It asks GitHub's timeline for PRs an
 
 `UNSURE` is a soft signal on purpose. A file can change for reasons unrelated to the issue. Skipping everything that touches a file is too strict; ignoring it is how you waste an evening. Look, then decide.
 
+## Install
+
+```bash
+pip install git+https://github.com/dafeiyupola/already-taken
+```
+
+No runtime dependencies — standard library only.
+
 ## Usage
 
 ```bash
@@ -42,7 +50,10 @@ export GITHUB_TOKEN=...        # public_repo is enough
 
 already-taken check pallets/flask#1234
 already-taken scan --label "good first issue" --since 2026-10-01 --limit 30
+already-taken scan --repo owner/name --label "good first issue" --limit 50
 ```
+
+Or without installing: `python3 already_taken.py check owner/repo#123`.
 
 `scan` prints three buckets: taken, worth a manual look, and free.
 
