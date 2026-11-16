@@ -50,6 +50,10 @@ def _is_bump(message: str) -> bool:
     return bool(BUMP_RE.search(message or ""))
 
 
+# Documentation churn is not evidence the issue was handled: generated indexes and
+# version bumps touch .md files constantly. One commit editing a doc marks every issue
+# that names it as UNSURE, which is how a 50-issue sample came back with 49 unsure.
+DOC_EXTS = (".md", ".txt", ".rst", ".adoc")
 FILE_RE = re.compile(r"[\w./-]+\.(?:py|ts|tsx|js|jsx|rs|go|md|yml|yaml|toml|json|rb|java|c|h|cpp)\b")
 
 FREE, TAKEN, UNSURE = "free", "taken", "unsure"
@@ -157,6 +161,10 @@ def _named_paths(issue: dict) -> list[str]:
         # An issue can name a path outside the repo ("../hi/QUICKSTART.md").
         # Asking GitHub for its history answers 500 and takes the whole check down.
         if path in seen or ".." in path.split("/") or path.startswith("/"):
+            continue
+        if path.lower().endswith(DOC_EXTS):
+            # A doc edit is not evidence the issue was handled. Generated indexes and
+            # version bump notes touch .md files constantly.
             continue
         seen.add(path)
         out.append(path)
