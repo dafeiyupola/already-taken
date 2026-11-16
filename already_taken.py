@@ -243,6 +243,7 @@ def main() -> int:
     s = sub.add_parser("scan", help="walk recent issues carrying a label")
     s.add_argument("--label", default="good first issue")
     s.add_argument("--since", default="2026-10-01")
+    s.add_argument("--until", default="", help="upper bound on creation time; without it the sample drifts as new issues arrive")
     s.add_argument("--limit", type=int, default=30)
     s.add_argument("--repo", help="only this owner/repo, e.g. pallets/flask")
 
@@ -282,14 +283,20 @@ def run(args, token: str) -> int:
         return {FREE: 0, TAKEN: 1, UNSURE: 2}[state]
 
     if getattr(args, "repo", None):
-        # GitHub's search API cannot be scoped to one repo reliably enough to
-        # page through a backlog, so ask the repo directly.
-        q = urllib.parse.quote(args.label)
-        found = get(f"{API}/repos/{args.repo}/issues?state=open&labels={q}&per_page={args.limit}", token)
-        issues = [i for i in found if "pull_request" not in i]
+        # Search, not the repo's issue list: only search can be pinned to a creation
+        # window, and a sample that cannot be pinned cannot be reproduced.
+        created = f'created:>{args.since}'
+        if getattr(args, "until", ""):
+            created += f' created:<{args.until}'
+        q = urllib.parse.quote(f'repo:{args.repo} label:"{args.label}" state:open type:issue {created}')
+        found = get(f"{API}/search/issues?q={q}&sort=created&order=asc&per_page={args.limit}", token)
+        issues = [i for i in found.get("items", []) if "pull_request" not in i]
     else:
-        q = urllib.parse.quote(f'label:"{args.label}" state:open type:issue created:>{args.since}')
-        found = get(f"{API}/search/issues?q={q}&sort=created&order=desc&per_page={args.limit}", token)
+        created = f'created:>{args.since}'
+        if getattr(args, "until", ""):
+            created += f' created:<{args.until}'
+        q = urllib.parse.quote(f'label:"{args.label}" state:open type:issue {created}')
+        found = get(f"{API}/search/issues?q={q}&sort=created&order=asc&per_page={args.limit}", token)
         issues = [i for i in found.get("items", []) if "pull_request" not in i]
     buckets = {FREE: [], TAKEN: [], UNSURE: []}
     for i in issues:
