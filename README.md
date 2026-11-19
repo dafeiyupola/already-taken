@@ -25,6 +25,8 @@ That is the case this tool is actually for. It asks GitHub's timeline for PRs an
 
 `docs/case-studies.md` walks through three issues that all looked unclaimed, with the command output and the links: one with an open PR underneath it, one already merged while the issue stayed open, and one with no reference anywhere that a commit had already changed.
 
+The three evenings behind it, and the two things the first version got wrong, are in [docs/why.md](docs/why.md).
+
 ## Verdicts
 
 | verdict | meaning | exit |
