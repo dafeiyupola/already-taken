@@ -306,6 +306,13 @@ def run(args, token: str) -> int:
         q = urllib.parse.quote(f'label:"{args.label}" state:open type:issue {created}')
         found = get(f"{API}/search/issues?q={q}&sort=created&order=asc&per_page={args.limit}", token)
         issues = [i for i in found.get("items", []) if "pull_request" not in i]
+    if not issues:
+        # Printing three empty sections looks the same as "everything is fine".
+        # It is not the same: it means the question was never asked.
+        where = getattr(args, "repo", None) or "the search"
+        print(f"no open issues labelled {args.label!r} in {where} — nothing was checked")
+        return 0
+
     buckets = {FREE: [], TAKEN: [], UNSURE: []}
     for i in issues:
         repo = i["repository_url"].split("/repos/")[-1]
