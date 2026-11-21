@@ -24,5 +24,5 @@ already-taken = "already_taken:main"
 py-modules = ["already_taken"]
 
 [tool.mypy]
-files = ["already_taken.py", "tests"]
+files = ["already_taken.py", "test_classify.py"]
 strict = true
