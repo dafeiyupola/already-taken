@@ -33,6 +33,7 @@ import sys
 import urllib.error
 import urllib.parse
 import urllib.request
+from typing import Any
 
 API = "https://api.github.com"
 # Messages that mean "a machine moved a version around", not "a person worked
@@ -70,7 +71,7 @@ class ApiError(RuntimeError):
     """A GitHub call failed; the caller decides whether that is fatal."""
 
 
-def get(url: str, token: str):
+def get(url: str, token: str) -> Any:
     req = urllib.request.Request(url, headers={
         "Authorization": "Bearer " + token,
         "Accept": "application/vnd.github+json",
@@ -87,7 +88,7 @@ def get(url: str, token: str):
         raise ApiError(f"network error: {e.reason} — {url}") from e
 
 
-def _explain(e, url: str) -> str:
+def _explain(e: Any, url: str) -> str:
     """A status code is not an error message. Say what to do about it."""
     if e.code == 401:
         return "GITHUB_TOKEN was rejected — check it is valid and not expired"
@@ -148,13 +149,13 @@ def timeline_refs(repo: str, num: int, token: str) -> list[tuple[str, str, str, 
     return out
 
 
-def _named_paths(issue: dict) -> list[str]:
+def _named_paths(issue: dict[str, object]) -> list[str]:
     """Paths the issue names, in the order they appear, deduplicated.
 
     Empty means the issue names no file at all — which is not the same as
     "no file changed", and the caller has to say so.
     """
-    text = (issue.get("title") or "") + "\n" + (issue.get("body") or "")
+    text = str(issue.get("title") or "") + "\n" + str(issue.get("body") or "")
     seen, out = set(), []
     for m in FILE_RE.finditer(text):
         path = m.group(0)
@@ -171,11 +172,11 @@ def _named_paths(issue: dict) -> list[str]:
     return out
 
 
-def files_touched(repo: str, num: int, token: str, issue: dict | None = None,
+def files_touched(repo: str, num: int, token: str, issue: dict[str, object] | None = None,
                   limit: int = 3) -> list[tuple[str, str, str]]:
     """Files the issue names that changed after it was opened."""
     issue = issue if issue is not None else get(f"{API}/repos/{repo}/issues/{num}", token)
-    opened = issue.get("created_at") or ""
+    opened = str(issue.get("created_at") or "")
     paths = _named_paths(issue)
     hits = []
     for path in list(paths)[:limit]:
@@ -192,17 +193,19 @@ def files_touched(repo: str, num: int, token: str, issue: dict | None = None,
     return hits
 
 
-def refs_as_dicts(refs) -> list[dict]:
+def refs_as_dicts(refs: list[tuple[str, str, str, bool]]) -> list[dict[str, object]]:
     """The evidence as JSON. Unpacks the real 4-tuple; the tests only ever
     exercised classify(), so the printing path went out unpinned once."""
     return [{"kind": k, "label": lbl, "state": st, "closes": cl} for k, lbl, st, cl in refs]
 
 
-def refs_as_lines(refs) -> list[str]:
+def refs_as_lines(refs: list[tuple[str, str, str, bool]]) -> list[str]:
     return [f"[{k} {st}{' closes' if cl else ''}] {lbl}" for k, lbl, st, cl in refs]
 
 
-def classify(refs, touched, closed: bool = False, files_named: int | None = None):
+def classify(refs: list[tuple[str, str, str, bool]],
+              touched: list[tuple[str, str, str]],
+              closed: bool = False, files_named: int | None = None) -> tuple[str, str]:
     """Pure: turn the evidence into a verdict. Kept separate so it can be tested."""
     mentioned = []
     for kind, label, state, closes in refs:
@@ -232,7 +235,7 @@ def classify(refs, touched, closed: bool = False, files_named: int | None = None
     return FREE, "no PR, no commit, and the files it names are untouched"
 
 
-def check(repo: str, num: int, token: str) -> tuple[str, str, list, list]:
+def check(repo: str, num: int, token: str) -> tuple[str, str, list[tuple[str, str, str, bool]], list[tuple[str, str, str]]]:
     refs = timeline_refs(repo, num, token)
     issue = get(f"{API}/repos/{repo}/issues/{num}", token)
     touched = files_touched(repo, num, token, issue)
@@ -268,7 +271,7 @@ def main() -> int:
         return 3
 
 
-def run(args, token: str) -> int:
+def run(args: Any, token: str) -> int:
     if args.cmd == "check":
         repo, _, num = args.target.partition("#")
         if not num.isdigit():
@@ -313,7 +316,7 @@ def run(args, token: str) -> int:
         print(f"no open issues labelled {args.label!r} in {where} — nothing was checked")
         return 0
 
-    buckets = {FREE: [], TAKEN: [], UNSURE: []}
+    buckets: dict[str, list[tuple[str, str, str]]] = {FREE: [], TAKEN: [], UNSURE: []}
     for i in issues:
         repo = i["repository_url"].split("/repos/")[-1]
         state, why, _, _ = check(repo, i["number"], token)
