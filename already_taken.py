@@ -107,7 +107,7 @@ def _explain(e, url: str) -> str:
     return f"GitHub answered {e.code} {e.reason} for {url}"
 
 
-CLOSING_RE = re.compile(r"\b(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?)\b[^\n]{0,60}?#(\d+)\b", re.I)
+CLOSING_RE = re.compile(r"\b(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?)\b[^\n]{0,60}?#(\d+)\b", re.IGNORECASE)
 
 
 def closes_issue(body: str | None, num: int) -> bool:
