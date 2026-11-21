@@ -22,3 +22,7 @@ already-taken = "already_taken:main"
 
 [tool.setuptools]
 py-modules = ["already_taken"]
+
+[tool.mypy]
+files = ["already_taken.py", "tests"]
+strict = true
